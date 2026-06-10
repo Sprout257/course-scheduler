@@ -114,16 +114,61 @@ function setupEventListeners() {
   const modal = document.getElementById("add-course-modal");
   const form = document.getElementById("add-custom-course-form");
 
+  // Flatpickr instances
+  let startPicker, endPicker, midtermPicker, finalPicker;
+
   if (openBtn && modal) {
     openBtn.addEventListener("click", () => {
       modal.style.display = "flex";
       renderColorPresets();
+
+      // Initialize flatpickr when opening modal (destroy first if they exist to prevent leaks)
+      if (startPicker) startPicker.destroy();
+      if (endPicker) endPicker.destroy();
+      if (midtermPicker) midtermPicker.destroy();
+      if (finalPicker) finalPicker.destroy();
+
+      startPicker = flatpickr("#custom-start-time", {
+        enableTime: true,
+        noCalendar: true,
+        dateFormat: "H:i",
+        time_24hr: true,
+        defaultDate: "09:00"
+      });
+
+      endPicker = flatpickr("#custom-end-time", {
+        enableTime: true,
+        noCalendar: true,
+        dateFormat: "H:i",
+        time_24hr: true,
+        defaultDate: "12:00"
+      });
+
+      midtermPicker = flatpickr("#custom-midterm-date", {
+        dateFormat: "d/m/Y",
+        placeholder: "เลือกวันสอบ Midterm"
+      });
+
+      finalPicker = flatpickr("#custom-final-date", {
+        dateFormat: "d/m/Y",
+        placeholder: "เลือกวันสอบ Final"
+      });
+
+      // Expose to window for form submission helper
+      window.midtermFlatpickr = midtermPicker;
+      window.finalFlatpickr = finalPicker;
     });
   }
 
   const hideModal = () => {
     if (modal) modal.style.display = "none";
     if (form) form.reset();
+    
+    // Destroy pickers
+    if (startPicker) startPicker.destroy();
+    if (endPicker) endPicker.destroy();
+    if (midtermPicker) midtermPicker.destroy();
+    if (finalPicker) finalPicker.destroy();
   };
 
   if (closeBtn) closeBtn.addEventListener("click", hideModal);
@@ -964,32 +1009,63 @@ function renderColorPresets() {
   selectedCustomColor = PRESET_COLORS[0]; // Reset selection to default
 }
 
+// Helper to convert date object and time range to Thai BE exam format
+function formatExamDateString(dateObj, timeRange) {
+  if (!dateObj || !timeRange) return "ไม่มีสอบ";
+  
+  // Get English day abbreviation
+  const days = ["SU", "M", "T", "W", "TH", "F", "SA"];
+  const dayAbbrev = days[dateObj.getDay()];
+  
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const yBE = dateObj.getFullYear() + 543; // Convert to Buddhist Era (BE)
+  
+  return `${dayAbbrev} ${d}/${m}/${yBE} ${timeRange}`;
+}
+
 function addCustomCourseFromForm() {
   const code = document.getElementById("custom-code").value.trim();
   const name = document.getElementById("custom-name").value.trim();
   const section = document.getElementById("custom-section").value.trim();
   const credits = Number(document.getElementById("custom-credits").value);
   const instructor = document.getElementById("custom-instructor").value.trim();
-  const room = document.getElementById("custom-room").value.trim();
   const day = document.getElementById("custom-day").value;
   const startTime = document.getElementById("custom-start-time").value;
   const endTime = document.getElementById("custom-end-time").value;
   const slotType = document.getElementById("custom-slot-type").value;
-  const midterm = document.getElementById("custom-midterm").value.trim();
-  const final = document.getElementById("custom-final").value.trim();
+  
+  // Parse exam dates from Flatpickr
+  const midtermDateArr = window.midtermFlatpickr ? window.midtermFlatpickr.selectedDates : [];
+  const midtermTime = document.getElementById("custom-midterm-time").value;
+  const midtermStr = midtermDateArr.length > 0 && midtermTime 
+    ? formatExamDateString(midtermDateArr[0], midtermTime)
+    : "ไม่มีสอบ";
 
-  // Create course object
+  const finalDateArr = window.finalFlatpickr ? window.finalFlatpickr.selectedDates : [];
+  const finalTime = document.getElementById("custom-final-time").value;
+  const finalStr = finalDateArr.length > 0 && finalTime 
+    ? formatExamDateString(finalDateArr[0], finalTime)
+    : "ไม่มีสอบ";
+
+  // Prepend "Sec " if the section input is just a number
+  let sectionFormatted = section;
+  if (sectionFormatted && !sectionFormatted.toLowerCase().startsWith("sec")) {
+    sectionFormatted = "Sec " + sectionFormatted;
+  }
+
+  // Create course object (Room is removed from inputs, defaulting to "ไม่ระบุ")
   const newCourse = {
     id: "custom-elective-" + Date.now(),
     code: code,
     name: name,
     credits: credits,
-    section: section,
+    section: sectionFormatted,
     instructor: instructor || "ไม่ระบุ",
-    room: room || "ไม่ระบุ",
+    room: "ไม่ระบุ",
     slots: [{ day: day, startTime: startTime, endTime: endTime, type: slotType }],
-    midterm: midterm || "ไม่มีสอบ",
-    final: final || "ไม่มีสอบ",
+    midterm: midtermStr,
+    final: finalStr,
     color: selectedCustomColor,
     tabId: "custom-elective"
   };

@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 </head>
 <body>
 
@@ -195,19 +196,15 @@
           </div>
           <div class="form-group">
             <label for="custom-section">ตอนเรียน (Section) <span class="required-star">*</span></label>
-            <input type="text" id="custom-section" placeholder="เช่น Sec 1" value="Sec 1" required>
+            <input type="text" id="custom-section" placeholder="เช่น 1" value="1" required>
           </div>
           <div class="form-group">
             <label for="custom-credits">หน่วยกิต <span class="required-star">*</span></label>
             <input type="number" id="custom-credits" min="1" max="10" value="3" required>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="grid-column: span 2;">
             <label for="custom-instructor">อาจารย์ผู้สอน</label>
             <input type="text" id="custom-instructor" placeholder="เช่น อ.สมศักดิ์ รักเรียน">
-          </div>
-          <div class="form-group">
-            <label for="custom-room">ห้องเรียน</label>
-            <input type="text" id="custom-room" placeholder="เช่น 75-604">
           </div>
         </div>
 
@@ -227,32 +224,57 @@
             </select>
           </div>
           <div class="form-group">
-            <label for="custom-start-time">เวลาเริ่มเรียน <span class="required-star">*</span></label>
-            <input type="time" id="custom-start-time" value="09:00" required>
-          </div>
-          <div class="form-group">
-            <label for="custom-end-time">เวลาสิ้นสุดเรียน <span class="required-star">*</span></label>
-            <input type="time" id="custom-end-time" value="12:00" required>
-          </div>
-          <div class="form-group">
             <label for="custom-slot-type">ประเภทชั่วโมง <span class="required-star">*</span></label>
             <select id="custom-slot-type" required>
               <option value="Lecture">ทฤษฎี (Lecture)</option>
               <option value="Lab">ปฏิบัติ (Lab)</option>
             </select>
           </div>
+          <div class="form-group">
+            <label for="custom-start-time">เวลาเริ่มเรียน <span class="required-star">*</span></label>
+            <input type="text" id="custom-start-time" value="09:00" required readonly>
+          </div>
+          <div class="form-group">
+            <label for="custom-end-time">เวลาสิ้นสุดเรียน <span class="required-star">*</span></label>
+            <input type="text" id="custom-end-time" value="12:00" required readonly>
+          </div>
         </div>
 
         <div class="form-divider">ตารางสอบ (Exam Schedule)</div>
         
-        <div class="form-group-grid">
-          <div class="form-group">
-            <label for="custom-midterm">วัน-เวลาสอบ Midterm</label>
-            <input type="text" id="custom-midterm" placeholder="เช่น TH 20/08/2569 16.30-19.30 (หรือเว้นว่าง)">
+        <div class="form-group-grid" style="grid-template-columns: 1fr; gap: 1rem;">
+          <!-- Midterm Exam -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label for="custom-midterm-date">วันสอบ Midterm</label>
+              <input type="text" id="custom-midterm-date" placeholder="เลือกวันสอบ Midterm" readonly>
+            </div>
+            <div class="form-group">
+              <label for="custom-midterm-time">เวลาสอบ Midterm</label>
+              <select id="custom-midterm-time">
+                <option value="">ไม่มีสอบ / ไม่ระบุ</option>
+                <option value="09.00-12.00">09.00-12.00 น.</option>
+                <option value="13.00-16.00">13.00-16.00 น.</option>
+                <option value="16.30-19.30">16.30-19.30 น.</option>
+              </select>
+            </div>
           </div>
-          <div class="form-group">
-            <label for="custom-final">วัน-เวลาสอบ Final</label>
-            <input type="text" id="custom-final" placeholder="เช่น M 26/10/2569 13.00-16.00 (หรือเว้นว่าง)">
+          
+          <!-- Final Exam -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label for="custom-final-date">วันสอบ Final</label>
+              <input type="text" id="custom-final-date" placeholder="เลือกวันสอบ Final" readonly>
+            </div>
+            <div class="form-group">
+              <label for="custom-final-time">เวลาสอบ Final</label>
+              <select id="custom-final-time">
+                <option value="">ไม่มีสอบ / ไม่ระบุ</option>
+                <option value="09.00-12.00">09.00-12.00 น.</option>
+                <option value="13.00-16.00">13.00-16.00 น.</option>
+                <option value="16.30-19.30">16.30-19.30 น.</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -271,6 +293,7 @@
 
   <!-- Scripts -->
   <script src="data.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="app.js"></script>
 </body>
 </html>

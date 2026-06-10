@@ -468,26 +468,36 @@ input, button, select, table {
   font-weight: 500;
 }
 
-/* Grid of 9 tabs */
-.tabs-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
+/* Rows of tabs */
+.tabs-rows-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
   padding: 1.25rem 1.5rem;
   background-color: #f8fafc;
   border-bottom: 1px solid var(--border-color);
 }
 
-@media(max-width: 900px) {
-  .tabs-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.tab-row {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
 }
 
-@media(max-width: 600px) {
-  .tabs-grid {
-    grid-template-columns: 1fr;
-  }
+.tab-row-label {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 70px;
+  text-align: left;
+}
+
+.tab-row-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  flex-grow: 1;
 }
 
 .tab-btn {
@@ -1414,6 +1424,14 @@ input, button, select, table {
   .modal-form {
     padding: 1rem;
     gap: 1rem;
+  }
+  .tab-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+  }
+  .tab-row-label {
+    min-width: auto;
   }
 }
 

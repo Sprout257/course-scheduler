@@ -964,11 +964,14 @@ let selectedCustomColor = PRESET_COLORS[0];
 
 function updateCustomTabVisibility() {
   const tabBtn = document.getElementById("custom-elective-tab");
+  const tabRow = document.getElementById("custom-elective-row");
   if (!tabBtn) return;
   if (customCourses.length > 0) {
     tabBtn.style.display = "block";
+    if (tabRow) tabRow.style.display = "flex";
   } else {
     tabBtn.style.display = "none";
+    if (tabRow) tabRow.style.display = "none";
     if (activeTab === "custom-elective") {
       activeTab = "y2-ra-b-c";
       // Update active tab styling

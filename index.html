@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2.1">
+  <link rel="stylesheet" href="styles.css?v=2.2">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 </head>
 <body>
@@ -151,18 +151,42 @@
         </button>
       </div>
       
-      <!-- Tab buttons (9 tabs + 1 custom tab) -->
-      <div class="tabs-grid">
-        <button class="tab-btn active" data-tab="y2-ra-b-c">YEAR 2 (RA/B/C)</button>
-        <button class="tab-btn" data-tab="y2-da-b">YEAR 2 (DA/B)</button>
-        <button class="tab-btn" data-tab="y2-csb">YEAR 2 (CSB)</button>
-        <button class="tab-btn" data-tab="y3-ra-b-c">YEAR 3 (RA/B/C)</button>
-        <button class="tab-btn" data-tab="y3-da-b">YEAR 3 (DA/B)</button>
-        <button class="tab-btn" data-tab="y3-csb">YEAR 3 (CSB)</button>
-        <button class="tab-btn" data-tab="y4-ra-b-c">YEAR 4 (RA/B/C)</button>
-        <button class="tab-btn" data-tab="y4-da-b">YEAR 4 (DA/B)</button>
-        <button class="tab-btn" data-tab="y4-csb">YEAR 4 (CSB)</button>
-        <button class="tab-btn" data-tab="custom-elective" id="custom-elective-tab" style="display: none; border-color: #d946ef; color: #d946ef;">วิชาเพิ่มเติม</button>
+      <!-- Tab buttons grouped by Year rows -->
+      <div class="tabs-rows-container">
+        <!-- Year 2 Row -->
+        <div class="tab-row">
+          <div class="tab-row-label">Year 2</div>
+          <div class="tab-row-buttons">
+            <button class="tab-btn active" data-tab="y2-ra-b-c">RA/B/C</button>
+            <button class="tab-btn" data-tab="y2-da-b">DA/B</button>
+            <button class="tab-btn" data-tab="y2-csb">CSB</button>
+          </div>
+        </div>
+        <!-- Year 3 Row -->
+        <div class="tab-row">
+          <div class="tab-row-label">Year 3</div>
+          <div class="tab-row-buttons">
+            <button class="tab-btn" data-tab="y3-ra-b-c">RA/B/C</button>
+            <button class="tab-btn" data-tab="y3-da-b">DA/B</button>
+            <button class="tab-btn" data-tab="y3-csb">CSB</button>
+          </div>
+        </div>
+        <!-- Year 4 Row -->
+        <div class="tab-row">
+          <div class="tab-row-label">Year 4</div>
+          <div class="tab-row-buttons">
+            <button class="tab-btn" data-tab="y4-ra-b-c">RA/B/C</button>
+            <button class="tab-btn" data-tab="y4-da-b">DA/B</button>
+            <button class="tab-btn" data-tab="y4-csb">CSB</button>
+          </div>
+        </div>
+        <!-- วิชาเพิ่มเติม (Custom Elective) Row -->
+        <div class="tab-row" id="custom-elective-row" style="display: none;">
+          <div class="tab-row-label" style="color: #d946ef;">วิชาเพิ่มเติม</div>
+          <div class="tab-row-buttons">
+            <button class="tab-btn" data-tab="custom-elective" id="custom-elective-tab" style="grid-column: span 3; border-color: #d946ef; color: #d946ef;">ดูวิชาเพิ่มเติม</button>
+          </div>
+        </div>
       </div>
 
       <!-- Course cards container -->

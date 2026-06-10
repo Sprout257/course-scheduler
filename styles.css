@@ -38,7 +38,7 @@
   --radius-lg: 16px;
   
   /* Timetable layout sizes */
-  --time-col-width: 1fr;
+  --time-col-width: minmax(0, 1fr);
   --day-col-width: 100px;
 }
 

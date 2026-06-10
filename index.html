@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini University Course Scheduler - v2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-icon">♊</div>
+      <h1>GEMINI UNIVERSITY COURSE SCHEDULER <span class="version-badge">v2</span></h1>
+    </div>
+    <div class="header-right">
+      <div class="student-info">
+        <span class="user-avatar">👤</span>
+        <label for="student-id-input">STUDENT ID:</label>
+        <input type="text" id="student-id-input" value="40613XXX" placeholder="กรอกรหัสนักศึกษา">
+      </div>
+      <button id="export-pdf-btn" class="btn btn-secondary">
+        <span class="btn-icon">📥</span> พิมพ์ตารางเรียน (PDF)
+      </button>
+      <button id="clear-schedule-btn" class="btn btn-danger-outline">ล้างตาราง</button>
+    </div>
+  </header>
+
+  <main class="app-container">
+    
+    <!-- Row 1: Course Schedule Timetable Grid -->
+    <section class="schedule-section card">
+      <div class="card-header">
+        <h2>Course Schedule (Digital - v2)</h2>
+        <div class="schedule-actions" style="display: flex; gap: 0.5rem;">
+          <span class="schedule-stats"><strong id="selected-count-badge">0</strong> วิชาที่เลือก</span>
+          <span class="schedule-stats" style="background-color: #ecfdf5; border-color: #a7f3d0; color: #065f46;"><strong id="selected-credits-badge" style="color: #047857;">0</strong> หน่วยกิตรวม</span>
+        </div>
+      </div>
+      
+      <div class="timetable-outer">
+        <div class="timetable-grid" id="timetable">
+          <!-- Timetable header row (Day / Time and hour markers) -->
+          <div class="grid-header-cell day-header-title">Day / Time</div>
+          <div class="grid-header-cell time-slot" data-hour="8">8:00</div>
+          <div class="grid-header-cell time-slot" data-hour="9">9:00</div>
+          <div class="grid-header-cell time-slot" data-hour="10">10:00</div>
+          <div class="grid-header-cell time-slot" data-hour="11">11:00</div>
+          <div class="grid-header-cell time-slot" data-hour="12">12:00</div>
+          <div class="grid-header-cell time-slot" data-hour="13">13:00</div>
+          <div class="grid-header-cell time-slot" data-hour="14">14:00</div>
+          <div class="grid-header-cell time-slot" data-hour="15">15:00</div>
+          <div class="grid-header-cell time-slot" data-hour="16">16:00</div>
+          <div class="grid-header-cell time-slot" data-hour="17">17:00</div>
+          <div class="grid-header-cell time-slot" data-hour="18">18:00</div>
+          <div class="grid-header-cell time-slot" data-hour="19">19:00</div>
+          <div class="grid-header-cell time-slot" data-hour="20">20:00</div>
+
+          <!-- Day Rows will be generated, but we can write them statically for clean grid styling -->
+          <!-- Monday (จันทร์) -->
+          <div class="day-label" data-day="Monday">จันทร์</div>
+          <div class="day-row" data-day="Monday"></div>
+          
+          <!-- Tuesday (อังคาร) -->
+          <div class="day-label" data-day="Tuesday">อังคาร</div>
+          <div class="day-row" data-day="Tuesday"></div>
+
+          <!-- Wednesday (พุธ) -->
+          <div class="day-label" data-day="Wednesday">พุธ</div>
+          <div class="day-row" data-day="Wednesday"></div>
+
+          <!-- Thursday (พฤหัสบดี) -->
+          <div class="day-label" data-day="Thursday">พฤหัสบดี</div>
+          <div class="day-row" data-day="Thursday"></div>
+
+          <!-- Friday (ศุกร์) -->
+          <div class="day-label" data-day="Friday">ศุกร์</div>
+          <div class="day-row" data-day="Friday"></div>
+
+          <!-- Saturday (เสาร์) -->
+          <div class="day-label" data-day="Saturday">เสาร์</div>
+          <div class="day-row" data-day="Saturday"></div>
+
+          <!-- Sunday (อาทิตย์) -->
+          <div class="day-label" data-day="Sunday">อาทิตย์</div>
+          <div class="day-row" data-day="Sunday"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Row 2: Selected Course Details Table -->
+    <section class="details-section card">
+      <div class="card-header">
+        <h2>Course Details (Digital - v2)</h2>
+        <span class="sub-header-title">Selected Course Details & Exam Schedules</span>
+      </div>
+
+      <!-- Container for exam conflicts warning banner -->
+      <div id="exam-conflict-container"></div>
+
+      <div class="table-container">
+        <table class="details-table" id="details-table">
+          <thead>
+            <tr>
+              <th rowspan="2" class="th-code">รหัสวิชา</th>
+              <th rowspan="2" class="th-name">Subject / Course Name</th>
+              <th rowspan="2" class="th-sec">ตอนเรียน</th>
+              <th rowspan="2" class="th-year" style="width: 8%; text-align: center;">ชั้นปี</th>
+              <th rowspan="2" class="th-time">วัน-เวลาเรียน</th>
+              <th rowspan="2" class="th-instructor">อาจารย์ผู้สอน</th>
+              <th colspan="2" class="th-exams">กำหนดสอบ</th>
+              <th rowspan="2" class="th-credits">หน่วยกิต</th>
+              <th rowspan="2" class="th-action">จัดการ</th>
+            </tr>
+            <tr>
+              <th class="th-sub-exam">Midterm</th>
+              <th class="th-sub-exam">Final</th>
+            </tr>
+          </thead>
+          <tbody id="details-tbody">
+            <!-- Selected rows generated by JS -->
+            <tr class="empty-row">
+              <td colspan="10">ยังไม่มีรายวิชาที่เลือก เลือกวิชาด้านบนเพื่อจัดตารางเรียน</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="total-credits-row">
+              <td colspan="8" class="text-right"><strong>หน่วยกิตรวม (Total Credits)</strong></td>
+              <td id="total-credits-cell" class="text-center highlight-credits">0</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+    <!-- Row 3: Year/Section Tabs and Course Selection Pool -->
+    <section class="selection-section card">
+      <div class="card-header">
+        <h2>Year / Section Tabs</h2>
+        <div class="tab-category-info">เลือกกลุ่มเรียนเพื่อดูรายวิชาที่เปิดสอน</div>
+      </div>
+      
+      <!-- Tab buttons (9 tabs total) -->
+      <div class="tabs-grid">
+        <button class="tab-btn active" data-tab="y2-ra-b-c">YEAR 2 (RA/B/C)</button>
+        <button class="tab-btn" data-tab="y2-da-b">YEAR 2 (DA/B)</button>
+        <button class="tab-btn" data-tab="y2-csb">YEAR 2 (CSB)</button>
+        <button class="tab-btn" data-tab="y3-ra-b-c">YEAR 3 (RA/B/C)</button>
+        <button class="tab-btn" data-tab="y3-da-b">YEAR 3 (DA/B)</button>
+        <button class="tab-btn" data-tab="y3-csb">YEAR 3 (CSB)</button>
+        <button class="tab-btn" data-tab="y4-ra-b-c">YEAR 4 (RA/B/C)</button>
+        <button class="tab-btn" data-tab="y4-da-b">YEAR 4 (DA/B)</button>
+        <button class="tab-btn" data-tab="y4-csb">YEAR 4 (CSB)</button>
+      </div>
+
+      <!-- Course cards container -->
+      <div class="courses-container" id="courses-pool">
+        <!-- Course cards will be generated by JS dynamically -->
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <p>© 2026 GEMINI UNIVERSITY COURSE SCHEDULER. พัฒนาขึ้นเพื่อจำลองการจัดตารางเรียนชั้นปีที่ 2, 3, และ 4.</p>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

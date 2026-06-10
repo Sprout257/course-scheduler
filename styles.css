@@ -38,7 +38,7 @@
   --radius-lg: 16px;
   
   /* Timetable layout sizes */
-  --time-col-width: minmax(35px, 1fr);
+  --time-col-width: 1fr;
   --day-col-width: 100px;
 }
 
@@ -288,7 +288,6 @@ input, button, select, table {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background-color: #ffffff;
-  width: max(100%, 1000px); /* Prevent WebKit/Safari from ignoring min-width and squishing the grid */
   min-width: 1000px; /* Keep it look good */
   position: relative;
 }
@@ -1399,6 +1398,9 @@ input, button, select, table {
   }
   .timetable-outer {
     padding: 0.5rem;
+  }
+  .timetable-grid {
+    width: 1000px;
   }
   .color-options-grid {
     justify-content: center;

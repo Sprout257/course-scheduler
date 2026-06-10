@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cs KMUTNB Course Scheduler - v2</title>
+  <title>Cs KMUTNB Course Scheduler</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -16,7 +16,7 @@
   <header class="app-header">
     <div class="header-left">
       <div class="logo-icon">♊</div>
-      <h1>Cs KMUTNB COURSE SCHEDULER <span class="version-badge">v2</span></h1>
+      <h1>Cs KMUTNB COURSE SCHEDULER</h1>
     </div>
     <div class="header-right">
       <div class="student-info">
@@ -28,6 +28,33 @@
         <span class="btn-icon">📥</span> พิมพ์ตารางเรียน (PDF)
       </button>
       <button id="clear-schedule-btn" class="btn btn-danger-outline">ล้างตาราง</button>
+      
+      <!-- User Authentication UI -->
+      <div class="auth-status-container">
+        <!-- Logged Out State (shown by default) -->
+        <button id="auth-login-btn" class="btn btn-primary">
+          <span class="btn-icon">🔐</span> เข้าสู่ระบบ
+        </button>
+
+        <!-- Logged In State (hidden by default) -->
+        <div id="auth-profile-dropdown" class="profile-dropdown" style="display: none;">
+          <button id="profile-trigger-btn" class="profile-trigger">
+            <img id="user-photo" class="profile-avatar" src="https://api.dicebear.com/7.x/bottts/svg?seed=user" alt="avatar">
+            <span id="user-display-name" class="profile-name">ผู้ใช้</span>
+            <span class="dropdown-arrow">▼</span>
+          </button>
+          <div class="dropdown-menu" id="profile-dropdown-menu">
+            <div class="dropdown-user-info">
+              <strong id="dropdown-user-name">ชื่อผู้ใช้</strong>
+              <span id="dropdown-user-email">email@example.com</span>
+            </div>
+            <div class="dropdown-divider"></div>
+            <button id="auth-logout-btn" class="dropdown-item">
+              <span class="item-icon">🚪</span> ออกจากระบบ
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -36,7 +63,7 @@
     <!-- Row 1: Course Schedule Timetable Grid -->
     <section class="schedule-section card">
       <div class="card-header">
-        <h2>Course Schedule (Digital - v2)</h2>
+        <h2>Course Schedule (Digital)</h2>
         <div class="schedule-actions" style="display: flex; gap: 0.5rem;">
           <span class="schedule-stats"><strong id="selected-count-badge">0</strong> วิชาที่เลือก</span>
           <span class="schedule-stats" style="background-color: #ecfdf5; border-color: #a7f3d0; color: #065f46;"><strong id="selected-credits-badge" style="color: #047857;">0</strong> หน่วยกิตรวม</span>
@@ -96,7 +123,7 @@
     <!-- Row 2: Selected Course Details Table -->
     <section class="details-section card">
       <div class="card-header">
-        <h2>Course Details (Digital - v2)</h2>
+        <h2>Course Details (Digital)</h2>
         <span class="sub-header-title">Selected Course Details & Exam Schedules</span>
       </div>
 
@@ -315,9 +342,49 @@
     </div>
   </div>
 
+  <!-- Modal for User Authentication -->
+  <div class="modal-overlay" id="auth-modal" style="display: none;">
+    <div class="modal-box scale-in" style="max-width: 420px;">
+      <div class="modal-header">
+        <h3 id="auth-modal-title">🔐 เข้าสู่ระบบ</h3>
+        <button class="modal-close-btn" id="close-auth-modal-btn">✕</button>
+      </div>
+      
+      <!-- Tab selectors: Sign In vs Sign Up -->
+      <div class="auth-tabs">
+        <button class="auth-tab-btn active" id="tab-signin-btn">เข้าสู่ระบบ</button>
+        <button class="auth-tab-btn" id="tab-signup-btn">สมัครสมาชิก</button>
+      </div>
+
+      <form id="auth-form" class="modal-form" style="padding: 1.25rem; gap: 1rem;">
+        <div class="form-group">
+          <label for="auth-student-id">รหัสนักศึกษา (Student ID) <span class="required-star">*</span></label>
+          <input type="text" id="auth-student-id" placeholder="กรอกรหัสนักศึกษา เช่น 640613xxx" required>
+        </div>
+        
+        <!-- Error message banner (hidden by default) -->
+        <div id="auth-error-banner" class="auth-error-banner" style="display: none;">
+          ⚠️ <span id="auth-error-text">เกิดข้อผิดพลาด</span>
+        </div>
+
+        <button type="submit" id="auth-submit-btn" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 0.65rem;">
+          เข้าสู่ระบบ
+        </button>
+
+        <div class="auth-divider-text"><span>หรือ</span></div>
+
+        <!-- Google Sign-In button -->
+        <button type="button" id="auth-google-btn" class="btn btn-secondary" style="width: 100%; justify-content: center; gap: 0.5rem; border-color: #cbd5e1; padding: 0.65rem;">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" alt="Google Logo" style="width: 18px; height: 18px;">
+          เข้าสู่ระบบด้วย Google
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="data.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <script src="app.js"></script>
+  <script src="app.js" type="module"></script>
 </body>
 </html>

@@ -1,6 +1,7 @@
 // State Management
 let selectedCourses = [];
 let activeTab = "y2-ra-b-c";
+let customCourses = [];
 
 // Load selected courses from LocalStorage if available
 if (localStorage.getItem("gemini_selected_courses")) {
@@ -10,6 +11,18 @@ if (localStorage.getItem("gemini_selected_courses")) {
     selectedCourses = [];
   }
 }
+
+// Load custom courses from LocalStorage if available
+if (localStorage.getItem("gemini_custom_courses")) {
+  try {
+    customCourses = JSON.parse(localStorage.getItem("gemini_custom_courses"));
+  } catch (e) {
+    customCourses = [];
+  }
+}
+
+// Bind custom electives into database key
+COURSE_DATABASE["custom-elective"] = customCourses;
 
 // Attach Tab ID to each course for easy reference
 Object.keys(COURSE_DATABASE).forEach(tabId => {
@@ -38,6 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.courseTooltip = tooltip;
 
   initTabs();
+  updateCustomTabVisibility();
   renderCoursesPool();
   renderSchedule();
   renderDetailsTable();
@@ -92,6 +106,44 @@ function setupEventListeners() {
       }, 700);
     }
   });
+
+  // Custom Course Modal Listeners
+  const openBtn = document.getElementById("open-add-custom-modal-btn");
+  const closeBtn = document.getElementById("close-add-modal-btn");
+  const cancelBtn = document.getElementById("cancel-add-btn");
+  const modal = document.getElementById("add-course-modal");
+  const form = document.getElementById("add-custom-course-form");
+
+  if (openBtn && modal) {
+    openBtn.addEventListener("click", () => {
+      modal.style.display = "flex";
+      renderColorPresets();
+    });
+  }
+
+  const hideModal = () => {
+    if (modal) modal.style.display = "none";
+    if (form) form.reset();
+  };
+
+  if (closeBtn) closeBtn.addEventListener("click", hideModal);
+  if (cancelBtn) cancelBtn.addEventListener("click", hideModal);
+
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) {
+        hideModal();
+      }
+    });
+  }
+
+  if (form) {
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      addCustomCourseFromForm();
+      hideModal();
+    });
+  }
 }
 
 function clearState() {
@@ -150,6 +202,26 @@ function renderCoursesPool() {
       `;
     });
 
+    let actionButtonsHtml = "";
+    if (activeTab === "custom-elective") {
+      actionButtonsHtml = `
+        <div style="display: flex; gap: 0.5rem; width: 100%;">
+          <button class="course-btn" ${exactSecSelected ? "disabled" : ""} style="flex: 2;">
+            ${exactSecSelected ? "เลือกแล้ว" : "เพิ่มเข้าตาราง"}
+          </button>
+          <button class="btn btn-danger-outline delete-custom-course-btn" style="flex: 1; padding: 0.5rem; justify-content: center; font-size: 0.8rem; margin: 0; min-height: unset; height: auto;" title="ลบวิชานี้ออกจากรายการ">
+            🗑️ ลบ
+          </button>
+        </div>
+      `;
+    } else {
+      actionButtonsHtml = `
+        <button class="course-btn" ${exactSecSelected ? "disabled" : ""}>
+          ${exactSecSelected ? "เลือกแล้ว" : "เพิ่มเข้าตาราง"}
+        </button>
+      `;
+    }
+
     card.innerHTML = `
       <div class="course-header">
         <span class="course-code">${course.code}</span>
@@ -164,19 +236,25 @@ function renderCoursesPool() {
         <div>📝 <strong>Mid:</strong> ${course.midterm}</div>
         <div>🏁 <strong>Final:</strong> ${course.final}</div>
       </div>
-      <button class="course-btn" ${exactSecSelected ? "disabled" : ""}>
-        ${exactSecSelected ? "เลือกแล้ว" : "เพิ่มเข้าตาราง"}
-      </button>
+      ${actionButtonsHtml}
     `;
 
-    // Add click handler
-    if (!exactSecSelected) {
-      card.querySelector(".course-btn").addEventListener("click", (e) => {
+    // Add click handler for course-btn
+    const courseBtn = card.querySelector(".course-btn");
+    if (courseBtn && !exactSecSelected) {
+      courseBtn.addEventListener("click", (e) => {
         addCourse(course, card);
       });
     }
 
-
+    // Add click handler for delete-custom-course-btn
+    const deleteBtn = card.querySelector(".delete-custom-course-btn");
+    if (deleteBtn) {
+      deleteBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        deleteCustomCourse(course.id);
+      });
+    }
 
     coursesPool.appendChild(card);
   });
@@ -519,6 +597,7 @@ function getCourseYearLabel(course) {
   if (tabId.startsWith("y2")) return "ปี 2";
   if (tabId.startsWith("y3")) return "ปี 3";
   if (tabId.startsWith("y4")) return "ปี 4";
+  if (tabId === "custom-elective") return "วิชาเพิ่มเติม";
   return "-";
 }
 
@@ -821,4 +900,143 @@ function updateExamConflictsUI(conflicts) {
   `;
 
   container.innerHTML = htmlContent;
+}
+
+// Custom Elective Helper Functions
+
+const PRESET_COLORS = [
+  "hsl(210, 75%, 65%)", // Blue
+  "hsl(145, 60%, 55%)", // Green
+  "hsl(330, 70%, 65%)", // Pink
+  "hsl(280, 65%, 60%)", // Purple
+  "hsl(35, 85%, 60%)",  // Orange
+  "hsl(180, 60%, 50%)", // Teal
+  "hsl(15, 75%, 60%)",  // Red
+  "hsl(250, 70%, 65%)"  // Indigo
+];
+
+let selectedCustomColor = PRESET_COLORS[0];
+
+function updateCustomTabVisibility() {
+  const tabBtn = document.getElementById("custom-elective-tab");
+  if (!tabBtn) return;
+  if (customCourses.length > 0) {
+    tabBtn.style.display = "block";
+  } else {
+    tabBtn.style.display = "none";
+    if (activeTab === "custom-elective") {
+      activeTab = "y2-ra-b-c";
+      // Update active tab styling
+      const tabBtns = document.querySelectorAll(".tab-btn");
+      tabBtns.forEach(b => {
+        if (b.dataset.tab === "y2-ra-b-c") {
+          b.classList.add("active");
+        } else {
+          b.classList.remove("active");
+        }
+      });
+      renderCoursesPool();
+    }
+  }
+}
+
+function renderColorPresets() {
+  const container = document.getElementById("custom-color-options");
+  if (!container) return;
+  container.innerHTML = "";
+
+  PRESET_COLORS.forEach((color, index) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "color-option-wrapper";
+    wrapper.innerHTML = `
+      <input type="radio" name="custom-color" id="color-${index}" class="color-option-input" value="${color}" ${index === 0 ? "checked" : ""}>
+      <label for="color-${index}" class="color-option-label" style="background-color: ${color};" title="เลือกสีนี้"></label>
+    `;
+    
+    wrapper.querySelector("input").addEventListener("change", (e) => {
+      if (e.target.checked) {
+        selectedCustomColor = e.target.value;
+      }
+    });
+
+    container.appendChild(wrapper);
+  });
+  selectedCustomColor = PRESET_COLORS[0]; // Reset selection to default
+}
+
+function addCustomCourseFromForm() {
+  const code = document.getElementById("custom-code").value.trim();
+  const name = document.getElementById("custom-name").value.trim();
+  const section = document.getElementById("custom-section").value.trim();
+  const credits = Number(document.getElementById("custom-credits").value);
+  const instructor = document.getElementById("custom-instructor").value.trim();
+  const room = document.getElementById("custom-room").value.trim();
+  const day = document.getElementById("custom-day").value;
+  const startTime = document.getElementById("custom-start-time").value;
+  const endTime = document.getElementById("custom-end-time").value;
+  const slotType = document.getElementById("custom-slot-type").value;
+  const midterm = document.getElementById("custom-midterm").value.trim();
+  const final = document.getElementById("custom-final").value.trim();
+
+  // Create course object
+  const newCourse = {
+    id: "custom-elective-" + Date.now(),
+    code: code,
+    name: name,
+    credits: credits,
+    section: section,
+    instructor: instructor || "ไม่ระบุ",
+    room: room || "ไม่ระบุ",
+    slots: [{ day: day, startTime: startTime, endTime: endTime, type: slotType }],
+    midterm: midterm || "ไม่มีสอบ",
+    final: final || "ไม่มีสอบ",
+    color: selectedCustomColor,
+    tabId: "custom-elective"
+  };
+
+  // Add to state and save
+  customCourses.push(newCourse);
+  localStorage.setItem("gemini_custom_courses", JSON.stringify(customCourses));
+  COURSE_DATABASE["custom-elective"] = customCourses;
+
+  // Make sure tab button is shown
+  updateCustomTabVisibility();
+
+  // Switch to the newly created tab automatically
+  activeTab = "custom-elective";
+  
+  // Highlight active class on tabs
+  const tabBtns = document.querySelectorAll(".tab-btn");
+  tabBtns.forEach(b => {
+    if (b.dataset.tab === "custom-elective") {
+      b.classList.add("active");
+    } else {
+      b.classList.remove("active");
+    }
+  });
+
+  // Re-render
+  renderCoursesPool();
+}
+
+function deleteCustomCourse(courseId) {
+  if (confirm("คุณต้องการลบวิชาเสรีนี้ออกจากรายการวิชาเพิ่มเติมใช่หรือไม่?")) {
+    // If currently scheduled, remove it
+    if (selectedCourses.some(c => c.id === courseId)) {
+      selectedCourses = selectedCourses.filter(c => c.id !== courseId);
+      saveState();
+      renderSchedule();
+      renderDetailsTable();
+    }
+
+    // Remove from custom list
+    customCourses = customCourses.filter(c => c.id !== courseId);
+    localStorage.setItem("gemini_custom_courses", JSON.stringify(customCourses));
+    COURSE_DATABASE["custom-elective"] = customCourses;
+
+    // Check visibility and pool
+    updateCustomTabVisibility();
+    renderCoursesPool();
+    highlightConflicts();
+  }
 }

@@ -140,12 +140,17 @@
 
     <!-- Row 3: Year/Section Tabs and Course Selection Pool -->
     <section class="selection-section card">
-      <div class="card-header">
-        <h2>Year / Section Tabs</h2>
-        <div class="tab-category-info">เลือกกลุ่มเรียนเพื่อดูรายวิชาที่เปิดสอน</div>
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+          <h2>Year / Section Tabs</h2>
+          <div class="tab-category-info">เลือกกลุ่มเรียนเพื่อดูรายวิชาที่เปิดสอน</div>
+        </div>
+        <button id="open-add-custom-modal-btn" class="btn btn-primary">
+          ➕ เพิ่มวิชาเสรี / วิชาเพิ่มเติม
+        </button>
       </div>
       
-      <!-- Tab buttons (9 tabs total) -->
+      <!-- Tab buttons (9 tabs + 1 custom tab) -->
       <div class="tabs-grid">
         <button class="tab-btn active" data-tab="y2-ra-b-c">YEAR 2 (RA/B/C)</button>
         <button class="tab-btn" data-tab="y2-da-b">YEAR 2 (DA/B)</button>
@@ -156,6 +161,7 @@
         <button class="tab-btn" data-tab="y4-ra-b-c">YEAR 4 (RA/B/C)</button>
         <button class="tab-btn" data-tab="y4-da-b">YEAR 4 (DA/B)</button>
         <button class="tab-btn" data-tab="y4-csb">YEAR 4 (CSB)</button>
+        <button class="tab-btn" data-tab="custom-elective" id="custom-elective-tab" style="display: none; border-color: #d946ef; color: #d946ef;">วิชาเพิ่มเติม</button>
       </div>
 
       <!-- Course cards container -->
@@ -169,6 +175,99 @@
   <footer class="app-footer">
     <p>© 2026 Cs KMUTNB COURSE SCHEDULER. พัฒนาขึ้นเพื่อจำลองการจัดตารางเรียนชั้นปีที่ 2, 3, และ 4.</p>
   </footer>
+
+  <!-- Modal for Adding Custom Course -->
+  <div class="modal-overlay" id="add-course-modal" style="display: none;">
+    <div class="modal-box scale-in">
+      <div class="modal-header">
+        <h3>➕ เพิ่มรายวิชาเพิ่มเติม / วิชาเสรี</h3>
+        <button class="modal-close-btn" id="close-add-modal-btn">✕</button>
+      </div>
+      <form id="add-custom-course-form" class="modal-form">
+        <div class="form-group-grid">
+          <div class="form-group">
+            <label for="custom-code">รหัสวิชา <span class="required-star">*</span></label>
+            <input type="text" id="custom-code" placeholder="เช่น 040613XXX" required>
+          </div>
+          <div class="form-group">
+            <label for="custom-name">ชื่อวิชา <span class="required-star">*</span></label>
+            <input type="text" id="custom-name" placeholder="เช่น Free Elective / ภาษาอังกฤษเพื่ออาชีพ" required>
+          </div>
+          <div class="form-group">
+            <label for="custom-section">ตอนเรียน (Section) <span class="required-star">*</span></label>
+            <input type="text" id="custom-section" placeholder="เช่น Sec 1" value="Sec 1" required>
+          </div>
+          <div class="form-group">
+            <label for="custom-credits">หน่วยกิต <span class="required-star">*</span></label>
+            <input type="number" id="custom-credits" min="1" max="10" value="3" required>
+          </div>
+          <div class="form-group">
+            <label for="custom-instructor">อาจารย์ผู้สอน</label>
+            <input type="text" id="custom-instructor" placeholder="เช่น อ.สมศักดิ์ รักเรียน">
+          </div>
+          <div class="form-group">
+            <label for="custom-room">ห้องเรียน</label>
+            <input type="text" id="custom-room" placeholder="เช่น 75-604">
+          </div>
+        </div>
+
+        <div class="form-divider">ตารางเรียน (Class Schedule)</div>
+        
+        <div class="form-group-grid">
+          <div class="form-group">
+            <label for="custom-day">วันเรียน <span class="required-star">*</span></label>
+            <select id="custom-day" required>
+              <option value="Monday">จันทร์ (Monday)</option>
+              <option value="Tuesday">อังคาร (Tuesday)</option>
+              <option value="Wednesday">พุธ (Wednesday)</option>
+              <option value="Thursday">พฤหัสบดี (Thursday)</option>
+              <option value="Friday">ศุกร์ (Friday)</option>
+              <option value="Saturday">เสาร์ (Saturday)</option>
+              <option value="Sunday">อาทิตย์ (Sunday)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="custom-start-time">เวลาเริ่มเรียน <span class="required-star">*</span></label>
+            <input type="time" id="custom-start-time" value="09:00" required>
+          </div>
+          <div class="form-group">
+            <label for="custom-end-time">เวลาสิ้นสุดเรียน <span class="required-star">*</span></label>
+            <input type="time" id="custom-end-time" value="12:00" required>
+          </div>
+          <div class="form-group">
+            <label for="custom-slot-type">ประเภทชั่วโมง <span class="required-star">*</span></label>
+            <select id="custom-slot-type" required>
+              <option value="Lecture">ทฤษฎี (Lecture)</option>
+              <option value="Lab">ปฏิบัติ (Lab)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-divider">ตารางสอบ (Exam Schedule)</div>
+        
+        <div class="form-group-grid">
+          <div class="form-group">
+            <label for="custom-midterm">วัน-เวลาสอบ Midterm</label>
+            <input type="text" id="custom-midterm" placeholder="เช่น TH 20/08/2569 16.30-19.30 (หรือเว้นว่าง)">
+          </div>
+          <div class="form-group">
+            <label for="custom-final">วัน-เวลาสอบ Final</label>
+            <input type="text" id="custom-final" placeholder="เช่น M 26/10/2569 13.00-16.00 (หรือเว้นว่าง)">
+          </div>
+        </div>
+
+        <div class="form-divider">เลือกสีประจำวิชา (Color Theme)</div>
+        <div class="color-options-grid" id="custom-color-options">
+          <!-- Will generate custom elegant color radio options -->
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="cancel-add-btn">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary">➕ เพิ่มวิชาเรียน</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- Scripts -->
   <script src="data.js"></script>

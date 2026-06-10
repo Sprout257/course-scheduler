@@ -1,14 +1,92 @@
+import { firebaseConfig } from "./firebase-config.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  onAuthStateChanged, 
+  signOut,
+  updateProfile
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  onSnapshot 
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
 // State Management
 let selectedCourses = [];
 let activeTab = "y2-ra-b-c";
 let customCourses = [];
 
-// Load selected courses from LocalStorage if available
-if (localStorage.getItem("gemini_selected_courses")) {
+let firebaseApp = null;
+let auth = null;
+let db = null;
+let firebaseEnabled = false;
+let currentUser = null;
+let firestoreUnsubscribe = null;
+let isSyncingFromCloud = false;
+
+// Check if credentials are set up
+const isConfigured = firebaseConfig && 
+                     firebaseConfig.apiKey && 
+                     firebaseConfig.apiKey !== "YOUR_API_KEY" && 
+                     firebaseConfig.projectId && 
+                     firebaseConfig.projectId !== "YOUR_PROJECT_ID";
+
+if (isConfigured) {
   try {
-    selectedCourses = JSON.parse(localStorage.getItem("gemini_selected_courses"));
+    firebaseApp = initializeApp(firebaseConfig);
+    auth = getAuth(firebaseApp);
+    db = getFirestore(firebaseApp);
+    firebaseEnabled = true;
+    console.log("🔥 Firebase initialized successfully!");
+  } catch (error) {
+    console.error("❌ Firebase initialization failed:", error);
+    firebaseEnabled = false;
+  }
+} else {
+  console.warn("⚠️ Firebase configuration keys are placeholders. Falling back to LocalStorage mode.");
+}
+
+// Check for shared schedule in URL
+const urlParams = new URLSearchParams(window.location.search);
+const shareCode = urlParams.get("share");
+if (shareCode) {
+  try {
+    const decodedStr = decodeURIComponent(escape(atob(shareCode)));
+    const shareData = JSON.parse(decodedStr);
+    if (shareData) {
+      // Overwrite student ID
+      if (shareData.studentId) {
+        localStorage.setItem("gemini_student_id", shareData.studentId);
+      }
+      
+      // Import/Merge Custom Courses
+      if (Array.isArray(shareData.custom)) {
+        const existingCustom = localStorage.getItem("gemini_custom_courses") 
+          ? JSON.parse(localStorage.getItem("gemini_custom_courses")) 
+          : [];
+        const mergedCustom = [...existingCustom];
+        shareData.custom.forEach(newItem => {
+          if (!mergedCustom.some(existing => existing.id === newItem.id)) {
+            mergedCustom.push(newItem);
+          }
+        });
+        localStorage.setItem("gemini_custom_courses", JSON.stringify(mergedCustom));
+      }
+
+      // Import Selected Courses (Temp storage)
+      if (Array.isArray(shareData.selected)) {
+        localStorage.setItem("gemini_selected_courses_temp", JSON.stringify(shareData.selected));
+      }
+    }
   } catch (e) {
-    selectedCourses = [];
+    console.error("Failed to parse share code", e);
   }
 }
 
@@ -30,6 +108,32 @@ Object.keys(COURSE_DATABASE).forEach(tabId => {
     course.tabId = tabId;
   });
 });
+
+// Load selected courses from LocalStorage or Shared Data if available
+if (localStorage.getItem("gemini_selected_courses_temp")) {
+  const sharedIds = JSON.parse(localStorage.getItem("gemini_selected_courses_temp"));
+  localStorage.removeItem("gemini_selected_courses_temp");
+  const resolved = [];
+  sharedIds.forEach(id => {
+    let found = null;
+    for (const key in COURSE_DATABASE) {
+      const match = COURSE_DATABASE[key].find(c => c.id === id);
+      if (match) {
+        found = match;
+        break;
+      }
+    }
+    if (found) resolved.push(found);
+  });
+  selectedCourses = resolved;
+  localStorage.setItem("gemini_selected_courses", JSON.stringify(selectedCourses));
+} else if (localStorage.getItem("gemini_selected_courses")) {
+  try {
+    selectedCourses = JSON.parse(localStorage.getItem("gemini_selected_courses"));
+  } catch (e) {
+    selectedCourses = [];
+  }
+}
 
 // DOM Elements
 const coursesPool = document.getElementById("courses-pool");
@@ -57,16 +161,110 @@ document.addEventListener("DOMContentLoaded", () => {
   renderDetailsTable();
   setupEventListeners();
 
+  initFirebaseAuth();
+
   // Load customized student ID
   if (localStorage.getItem("gemini_student_id")) {
     studentIdInput.value = localStorage.getItem("gemini_student_id");
+  }
+
+  // Clean up URL if we imported a schedule and show confirmation
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get("share")) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    setTimeout(() => {
+      alert("🎉 โหลดตารางเรียนที่แชร์สำเร็จแล้ว!");
+    }, 400);
   }
 });
 
 // Setup Action Listeners
 function setupEventListeners() {
+  let studentIdTimeout = null;
+  
+  // Helper to manage Student ID popover
+  const updateStudentIdPopover = () => {
+    let popover = document.getElementById("student-id-popover");
+    if (!popover && studentIdInput) {
+      popover = document.createElement("div");
+      popover.id = "student-id-popover";
+      popover.className = "student-id-popover";
+      studentIdInput.parentElement.appendChild(popover);
+    }
+    if (popover && studentIdInput) {
+      const val = studentIdInput.value.trim() || "(ยังไม่ได้ระบุ)";
+      const statusLabel = currentUser 
+        ? `<span class="tooltip-sec" style="color: #16a34a;">🌐 ล็อกอินคลาวด์</span>`
+        : `<span class="tooltip-sec" style="color: #475569;">💾 ออฟไลน์จำลอง</span>`;
+      
+      const emailLabel = currentUser ? currentUser.email : "LocalStorage เท่านั้น";
+      const totalCredits = selectedCourses.reduce((sum, c) => sum + c.credits, 0);
+      
+      popover.innerHTML = `
+        <div class="tooltip-header" style="border-left: 4px solid var(--color-primary); padding-left: 0.5rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-weight: 700; font-size: 0.82rem;">👤 ข้อมูลนักศึกษา</span>
+          ${statusLabel}
+        </div>
+        <div class="tooltip-title" style="margin-bottom: 0.4rem; font-size: 0.85rem; font-weight: 700; color: var(--text-main);">
+          รหัสนักศึกษา: <strong style="font-family: var(--font-display);">${val}</strong>
+        </div>
+        <div class="tooltip-details" style="font-size: 0.76rem; display: flex; flex-direction: column; gap: 0.25rem;">
+          <div>📧 <strong>บัญชี:</strong> ${emailLabel}</div>
+          <div class="tooltip-divider" style="height: 1px; background-color: #e2e8f0; margin: 0.4rem 0;"></div>
+          <div style="display: flex; justify-content: space-between; color: var(--text-muted);">
+            <span>📚 วิชาที่เลือก:</span>
+            <strong style="color: var(--text-main);">${selectedCourses.length} วิชา</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; color: var(--text-muted);">
+            <span>💳 หน่วยกิตรวม:</span>
+            <strong style="color: var(--text-main);">${totalCredits} หน่วยกิต</strong>
+          </div>
+        </div>
+      `;
+    }
+  };
+
+  let isStudentIdFocused = false;
+
+  studentIdInput.addEventListener("focus", () => {
+    isStudentIdFocused = true;
+    updateStudentIdPopover();
+    const popover = document.getElementById("student-id-popover");
+    if (popover) popover.classList.add("visible");
+  });
+
+  studentIdInput.addEventListener("blur", () => {
+    isStudentIdFocused = false;
+    const popover = document.getElementById("student-id-popover");
+    if (popover) popover.classList.remove("visible");
+  });
+
+  const studentInfoContainer = studentIdInput.parentElement;
+  if (studentInfoContainer) {
+    studentInfoContainer.addEventListener("mouseenter", () => {
+      updateStudentIdPopover();
+      const popover = document.getElementById("student-id-popover");
+      if (popover) popover.classList.add("visible");
+    });
+
+    studentInfoContainer.addEventListener("mouseleave", () => {
+      if (!isStudentIdFocused) {
+        const popover = document.getElementById("student-id-popover");
+        if (popover) popover.classList.remove("visible");
+      }
+    });
+  }
+
   studentIdInput.addEventListener("input", (e) => {
     localStorage.setItem("gemini_student_id", e.target.value);
+    
+    // Update popover content in real-time
+    updateStudentIdPopover();
+
+    clearTimeout(studentIdTimeout);
+    studentIdTimeout = setTimeout(() => {
+      saveState();
+    }, 1000); // Debounce for 1 second to limit writes
   });
 
   exportPdfBtn.addEventListener("click", () => {
@@ -200,8 +398,23 @@ function clearState() {
   renderDetailsTable();
 }
 
-function saveState() {
+async function saveState() {
   localStorage.setItem("gemini_selected_courses", JSON.stringify(selectedCourses));
+  
+  if (firebaseEnabled && currentUser && !isSyncingFromCloud) {
+    try {
+      const userDocRef = doc(db, "schedules", currentUser.uid);
+      await setDoc(userDocRef, {
+        studentId: studentIdInput.value || "",
+        selectedCourseIds: selectedCourses.map(c => c.id),
+        customCourses: customCourses,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      console.log("☁️ State synced to Firebase Cloud.");
+    } catch (err) {
+      console.error("❌ Failed to sync state to Firebase Cloud:", err);
+    }
+  }
 }
 
 // Tab Switching Logic
@@ -1077,6 +1290,7 @@ function addCustomCourseFromForm() {
   customCourses.push(newCourse);
   localStorage.setItem("gemini_custom_courses", JSON.stringify(customCourses));
   COURSE_DATABASE["custom-elective"] = customCourses;
+  saveState(); // Sync custom course addition to Cloud Firestore
 
   // Make sure tab button is shown
   updateCustomTabVisibility();
@@ -1112,10 +1326,342 @@ function deleteCustomCourse(courseId) {
     customCourses = customCourses.filter(c => c.id !== courseId);
     localStorage.setItem("gemini_custom_courses", JSON.stringify(customCourses));
     COURSE_DATABASE["custom-elective"] = customCourses;
+    saveState(); // Sync custom course deletion to Cloud Firestore
 
     // Check visibility and pool
     updateCustomTabVisibility();
     renderCoursesPool();
     highlightConflicts();
+  }
+}
+
+// Auth State & UI bindings for Firebase
+function initFirebaseAuth() {
+  const loginBtn = document.getElementById("auth-login-btn");
+  const logoutBtn = document.getElementById("auth-logout-btn");
+  const authModal = document.getElementById("auth-modal");
+  const closeAuthModalBtn = document.getElementById("close-auth-modal-btn");
+  const authForm = document.getElementById("auth-form");
+  const authStudentIdInput = document.getElementById("auth-student-id");
+  const authSubmitBtn = document.getElementById("auth-submit-btn");
+  const authGoogleBtn = document.getElementById("auth-google-btn");
+  
+  const tabSigninBtn = document.getElementById("tab-signin-btn");
+  const tabSignupBtn = document.getElementById("tab-signup-btn");
+  const authModalTitle = document.getElementById("auth-modal-title");
+  
+  const authErrorBanner = document.getElementById("auth-error-banner");
+  const authErrorText = document.getElementById("auth-error-text");
+  
+  const profileDropdown = document.getElementById("auth-profile-dropdown");
+  const profileTriggerBtn = document.getElementById("profile-trigger-btn");
+  const userPhotoImg = document.getElementById("user-photo");
+  const userDisplayNameSpan = document.getElementById("user-display-name");
+  const dropdownUserName = document.getElementById("dropdown-user-name");
+  const dropdownUserEmail = document.getElementById("dropdown-user-email");
+  
+  let currentAuthTab = "signin"; // "signin" or "signup"
+  
+  // 1. Show Auth Modal
+  if (loginBtn) {
+    loginBtn.addEventListener("click", () => {
+      resetAuthModal();
+      authModal.style.display = "flex";
+    });
+  }
+  
+  // 2. Hide Auth Modal
+  if (closeAuthModalBtn) {
+    closeAuthModalBtn.addEventListener("click", hideAuthModal);
+  }
+  
+  authModal.addEventListener("click", (e) => {
+    if (e.target === authModal) {
+      hideAuthModal();
+    }
+  });
+  
+  function hideAuthModal() {
+    authModal.style.display = "none";
+    resetAuthModal();
+  }
+  
+  function resetAuthModal() {
+    if (authStudentIdInput) {
+      const rememberedId = localStorage.getItem("gemini_last_logged_in_student_id") || "";
+      authStudentIdInput.value = rememberedId;
+    }
+    authErrorBanner.style.display = "none";
+    authSubmitBtn.disabled = false;
+    authSubmitBtn.textContent = currentAuthTab === "signin" ? "เข้าสู่ระบบ" : "สมัครสมาชิก";
+  }
+  
+  // 3. Tab Toggles
+  if (tabSigninBtn && tabSignupBtn) {
+    tabSigninBtn.addEventListener("click", () => {
+      if (currentAuthTab === "signin") return;
+      currentAuthTab = "signin";
+      tabSigninBtn.classList.add("active");
+      tabSignupBtn.classList.remove("active");
+      authModalTitle.textContent = "🔐 เข้าสู่ระบบ";
+      authSubmitBtn.textContent = "เข้าสู่ระบบ";
+      authErrorBanner.style.display = "none";
+    });
+    
+    tabSignupBtn.addEventListener("click", () => {
+      if (currentAuthTab === "signup") return;
+      currentAuthTab = "signup";
+      tabSignupBtn.classList.add("active");
+      tabSigninBtn.classList.remove("active");
+      authModalTitle.textContent = "📝 สมัครสมาชิก";
+      authSubmitBtn.textContent = "สมัครสมาชิก";
+      authErrorBanner.style.display = "none";
+    });
+  }
+  
+  // 4. Dropdown Toggle
+  if (profileTriggerBtn) {
+    profileTriggerBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      profileDropdown.classList.toggle("active");
+    });
+  }
+  
+  // Close dropdown on click outside
+  window.addEventListener("click", () => {
+    if (profileDropdown && profileDropdown.classList.contains("active")) {
+      profileDropdown.classList.remove("active");
+    }
+  });
+  
+  // 5. Submit Student ID Form
+  if (authForm) {
+    authForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const studentId = authStudentIdInput.value.trim();
+      if (!studentId) return;
+      
+      authErrorBanner.style.display = "none";
+      authSubmitBtn.disabled = true;
+      authSubmitBtn.textContent = currentAuthTab === "signin" ? "กำลังเข้าสู่ระบบ..." : "กำลังสมัครสมาชิก...";
+
+      if (!firebaseEnabled) {
+        setTimeout(() => {
+          authErrorBanner.style.display = "block";
+          authErrorText.textContent = "ระบบคลาวด์ยังไม่ได้ตั้งค่า กรุณากรอก Config ของคุณในไฟล์ firebase-config.js เพื่อเปิดใช้งานระบบสมาชิก";
+          authSubmitBtn.disabled = false;
+          authSubmitBtn.textContent = currentAuthTab === "signin" ? "เข้าสู่ระบบ" : "สมัครสมาชิก";
+        }, 500);
+        return;
+      }
+      
+      const cleanStudentId = studentId.toLowerCase();
+      const email = `${cleanStudentId}@student.kmutnb.ac.th`;
+      const password = `kmutnb_pass_${cleanStudentId}`;
+      
+      try {
+        if (currentAuthTab === "signin") {
+          await signInWithEmailAndPassword(auth, email, password);
+        } else {
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          // Set display name to Student ID
+          await updateProfile(userCredential.user, {
+            displayName: studentId
+          });
+        }
+        hideAuthModal();
+      } catch (err) {
+        console.error("Auth error:", err);
+        authErrorBanner.style.display = "block";
+        authErrorText.textContent = translateAuthError(err.code);
+        authSubmitBtn.disabled = false;
+        authSubmitBtn.textContent = currentAuthTab === "signin" ? "เข้าสู่ระบบ" : "สมัครสมาชิก";
+      }
+    });
+  }
+  
+  // 6. Sign In with Google
+  if (authGoogleBtn) {
+    authGoogleBtn.addEventListener("click", async () => {
+      authErrorBanner.style.display = "none";
+      
+      if (!firebaseEnabled) {
+        authErrorBanner.style.display = "block";
+        authErrorText.textContent = "ระบบคลาวด์ยังไม่ได้ตั้งค่า กรุณากรอก Config ของคุณในไฟล์ firebase-config.js เพื่อเปิดใช้งานระบบสมาชิก";
+        return;
+      }
+
+      const provider = new GoogleAuthProvider();
+      try {
+        await signInWithPopup(auth, provider);
+        hideAuthModal();
+      } catch (err) {
+        console.error("Google Auth error:", err);
+        if (err.code !== "auth/popup-closed-by-user") {
+          authErrorBanner.style.display = "block";
+          authErrorText.textContent = translateAuthError(err.code);
+        }
+      }
+    });
+  }
+  
+  // 7. Sign Out
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      if (!firebaseEnabled) return;
+      try {
+        // Clear local memory state
+        selectedCourses = [];
+        customCourses = [];
+        
+        // Remove data from localStorage
+        localStorage.removeItem("gemini_selected_courses");
+        localStorage.removeItem("gemini_custom_courses");
+        localStorage.removeItem("gemini_student_id");
+        
+        // Reset inputs
+        if (studentIdInput) studentIdInput.value = "40613XXX";
+        
+        await signOut(auth);
+      } catch (err) {
+        console.error("Signout error:", err);
+      }
+    });
+  }
+  
+  // 8. Observe Auth Changes
+  if (firebaseEnabled) {
+    onAuthStateChanged(auth, (user) => {
+      currentUser = user;
+      
+      // Clean up active snapshot listener if any
+      if (firestoreUnsubscribe) {
+        firestoreUnsubscribe();
+        firestoreUnsubscribe = null;
+      }
+      
+      if (user) {
+        // User is logged in
+        console.log(`👤 User logged in: ${user.email} (UID: ${user.uid})`);
+        
+        // Update UI Header
+        if (loginBtn) loginBtn.style.display = "none";
+        if (profileDropdown) profileDropdown.style.display = "inline-block";
+        
+        const name = user.displayName || user.email.split("@")[0];
+        const photo = user.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.uid}`;
+        
+        if (name && studentIdInput && name.indexOf(" ") === -1 && !isNaN(name.charAt(0))) {
+          // Simple heuristic: if name doesn't contain spaces and starts with a digit, it's likely a student ID
+          studentIdInput.value = name;
+          localStorage.setItem("gemini_student_id", name);
+          localStorage.setItem("gemini_last_logged_in_student_id", name);
+        }
+        
+        if (userDisplayNameSpan) userDisplayNameSpan.textContent = name;
+        if (userPhotoImg) userPhotoImg.src = photo;
+        if (dropdownUserName) dropdownUserName.textContent = name;
+        if (dropdownUserEmail) dropdownUserEmail.textContent = user.email;
+        
+        // Set up real-time firestore listener
+        const userDocRef = doc(db, "schedules", user.uid);
+        firestoreUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            console.log("☁️ Real-time cloud sync received:", data);
+            
+            isSyncingFromCloud = true;
+            
+            // 1. Sync Student ID
+            if (data.studentId !== undefined) {
+              studentIdInput.value = data.studentId;
+              localStorage.setItem("gemini_student_id", data.studentId);
+            }
+            
+            // 2. Sync Custom Courses
+            if (Array.isArray(data.customCourses)) {
+              customCourses = data.customCourses;
+              localStorage.setItem("gemini_custom_courses", JSON.stringify(customCourses));
+              COURSE_DATABASE["custom-elective"] = customCourses;
+            }
+            
+            // 3. Sync Selected Courses
+            if (Array.isArray(data.selectedCourseIds)) {
+              const resolved = [];
+              data.selectedCourseIds.forEach(id => {
+                let found = null;
+                for (const key in COURSE_DATABASE) {
+                  const match = COURSE_DATABASE[key].find(c => c.id === id);
+                  if (match) {
+                    found = match;
+                    break;
+                  }
+                }
+                if (found) resolved.push(found);
+              });
+              selectedCourses = resolved;
+              localStorage.setItem("gemini_selected_courses", JSON.stringify(selectedCourses));
+            }
+            
+            // 4. Update UI
+            updateCustomTabVisibility();
+            renderCoursesPool();
+            renderSchedule();
+            renderDetailsTable();
+            highlightConflicts();
+            
+            isSyncingFromCloud = false;
+          } else {
+            // If no cloud document exists yet, sync the local state to cloud initially
+            console.log("☁️ No cloud data found. Uploading initial local state...");
+            saveState();
+          }
+        }, (error) => {
+          console.error("Firestore sync error:", error);
+        });
+        
+      } else {
+        // User is logged out
+        console.log("👤 User logged out.");
+        if (loginBtn) loginBtn.style.display = "inline-flex";
+        if (profileDropdown) profileDropdown.style.display = "none";
+        
+        // Normal render (keep LocalStorage data)
+        renderCoursesPool();
+        renderSchedule();
+        renderDetailsTable();
+      }
+    });
+  } else {
+    // Normal render (keep LocalStorage data) if Firebase is not active
+    renderCoursesPool();
+    renderSchedule();
+    renderDetailsTable();
+  }
+}
+
+// Translate Firebase Auth Errors to user-friendly Thai
+function translateAuthError(code) {
+  switch (code) {
+    case "auth/invalid-email":
+      return "รูปแบบรหัสนักศึกษาไม่ถูกต้อง";
+    case "auth/user-disabled":
+      return "บัญชีผู้ใช้นี้ถูกระงับการใช้งาน";
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+    case "auth/invalid-credential":
+      return "ไม่พบรหัสนักศึกษานี้ในระบบ หรือรหัสผ่านจำลองไม่ตรงกัน กรุณาตรวจสอบหรือสมัครสมาชิกก่อน";
+    case "auth/email-already-in-use":
+      return "รหัสนักศึกษานี้ถูกลงทะเบียนเข้าใช้งานแล้ว";
+    case "auth/weak-password":
+      return "รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร";
+    case "auth/operation-not-allowed":
+      return "ระบบล็อกอินนี้ยังไม่ได้เปิดใช้งาน";
+    case "auth/network-request-failed":
+      return "การเชื่อมต่อเครือข่ายล้มเหลว กรุณาตรวจสอบอินเทอร์เน็ต";
+    default:
+      return "เกิดข้อผิดพลาดไม่ทราบสาเหตุ กรุณาลองใหม่อีกครั้ง";
   }
 }
